@@ -3,6 +3,8 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
+        <entry key="..\:/Android/Projects/Library/TouchUtils/app/src/main/res/drawable/vc_rtc_ic_mute.xml" value="0.196" />
+        <entry key="..\:/Android/Projects/Library/TouchUtils/app/src/main/res/drawable/vc_rtc_selector_mute.xml" value="0.196" />
         <entry key="..\:/Android/Projects/Library/TouchUtils/app/src/main/res/layout/activity_main.xml" value="0.33541666666666664" />
       </map>
     </option>

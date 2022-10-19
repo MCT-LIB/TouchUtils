@@ -721,7 +721,7 @@ public class TouchUtils {
         private static final float DEFAULT_DELTA_SCALE = 0.25f;
         private static final int DEFAULT_DURATION = 250;
         private static final int MIN_TAP_TIME = 1000;
-        private static final int DEFAULT_OFFSET_RELEASE = 75;
+        private static final int DEFAULT_OFFSET_RELEASE = 0;
 
         private boolean isRelease;
 
@@ -753,10 +753,11 @@ public class TouchUtils {
             }
             float x = event.getRawX();
             float y = event.getRawY();
-            if (x < view.getX() - getOffsetReleaseX() ||
-                    x > view.getX() + view.getWidth() + getOffsetReleaseX() ||
-                    y < view.getY() - getOffsetReleaseY() ||
-                    y > view.getY() + view.getHeight() + getOffsetReleaseY()) {
+            Point position = getLocationOnScreen(view);
+            if (x < position.x - getOffsetReleaseX() ||
+                    x > position.x + view.getWidth() + getOffsetReleaseX() ||
+                    y < position.y - getOffsetReleaseY() ||
+                    y > position.y + view.getHeight() + getOffsetReleaseY()) {
                 release(view, false);
             }
             return true;
@@ -914,6 +915,13 @@ public class TouchUtils {
         int dx = a.x - b.x;
         int dy = a.y - b.y;
         return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    @NonNull
+    public static Point getLocationOnScreen(@NonNull View view) {
+        int[] location = new int[2];
+        view.getLocationOnScreen(location);
+        return new Point(location[0], location[1]);
     }
 
 }

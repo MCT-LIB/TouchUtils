@@ -81,28 +81,28 @@ public class MainActivity extends AppCompatActivity {
 
         View box = findViewById(R.id.box);
 
-        TouchUtils.setTouchListener(box, new TouchUtils.TouchMoveCornerListener() {
-            @NonNull
-            @Override
-            public Rect initArea(View view) {
-                final int left = 0, top = 0, right = getScreenWidth(), bottom = getScreenHeight() - 140;
-                return new Rect(left, top, right, bottom);
-            }
-
+//        TouchUtils.setTouchListener(box, new TouchUtils.TouchMoveCornerListener() {
 //            @NonNull
 //            @Override
-//            protected Rect initAnimArea(@NonNull View view) {
-//                int width = view.getWidth() / 2;
-//                int height = view.getHeight() / 2;
-//                Rect area = getArea();
-//                return new Rect(
-//                        area.left - width,
-//                        area.top - height,
-//                        area.right - view.getWidth() + width,
-//                        area.bottom - view.getHeight() + height
-//                );
+//            public Rect initArea(View view) {
+//                final int left = 0, top = 0, right = getScreenWidth(), bottom = getScreenHeight() - 140;
+//                return new Rect(left, top, right, bottom);
 //            }
-        });
+//
+////            @NonNull
+////            @Override
+////            protected Rect initAnimArea(@NonNull View view) {
+////                int width = view.getWidth() / 2;
+////                int height = view.getHeight() / 2;
+////                Rect area = getArea();
+////                return new Rect(
+////                        area.left - width,
+////                        area.top - height,
+////                        area.right - view.getWidth() + width,
+////                        area.bottom - view.getHeight() + height
+////                );
+////            }
+//        });
 
 //        TouchUtils.setTouchListener(box, new TouchUtils.FlingMoveToWallListener() {
 //            @NonNull
@@ -113,7 +113,8 @@ public class MainActivity extends AppCompatActivity {
 //            }
 //        });
 
-//        TouchUtils.setTouchListener(box, new TouchUtils.TouchScaleListener());
+        TouchUtils.setTouchListener(box, new TouchUtils.TouchScaleListener());
+
     }
 
     int getScreenWidth() {
