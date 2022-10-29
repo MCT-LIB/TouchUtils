@@ -508,7 +508,7 @@ public class TouchUtils {
         private int maximumFlingVelocity;
 
         private boolean isInit;
-        private Rect area, moveArea;
+        private Rect area, moveArea, animArea;
         private SpringAnimation springX;
         private FlingAnimation flingX, flingY;
         private VelocityTracker velocityTracker;
@@ -521,9 +521,11 @@ public class TouchUtils {
         public void init(View v) {
             isInit = true;
             setArea(v, initArea(v));
-            ViewConfiguration configuration = ViewConfiguration.get(v.getContext());
-            Rect animArea = initAnimArea(v);
-            maximumFlingVelocity = configuration.getScaledMaximumFlingVelocity();
+            animArea = initAnimArea(v);
+            int maxFling = getMaximumFlingVelocity(v);
+            maximumFlingVelocity = maxFling <= 0
+                    ? ViewConfiguration.get(v.getContext()).getScaledMaximumFlingVelocity()
+                    : maxFling;
             springX = new SpringAnimation(v, getPropX(), 0);
             springX.setMinValue(animArea.left);
             springX.setMaxValue(animArea.right);
@@ -583,15 +585,20 @@ public class TouchUtils {
                     moveToWall(view);
                     return onStop(view, event);
                 }
-                final float vx25p = Math.abs(vx) * 25 / 100;
-                final float vy25p = Math.abs(vy) * 25 / 100;
                 // fling move listener
                 OnAnimationUpdateListener updateListener = new OnAnimationUpdateListener() {
 
+                    final float minVelocityToStop =
+                            Math.max(Math.abs(vx), Math.abs(vy)) * getPercentVelocityToStopMove() / 100;
+
                     @Override
-                    public void onAnimationUpdate(DynamicAnimation animation, float value, float velocity) {
-                        float v = Math.abs(velocity);
-                        if (v < vx25p || v < vy25p) {
+                    public void onAnimationUpdate(DynamicAnimation animation, float val, float velocity) {
+                        if (Math.abs(velocity) < minVelocityToStop
+                                || val == animArea.left
+                                || val == animArea.top
+                                || val == animArea.right
+                                || val == animArea.bottom
+                        ) {
                             flingX.cancel();
                             flingX.removeUpdateListener(this);
                             flingY.removeUpdateListener(this);
@@ -600,6 +607,7 @@ public class TouchUtils {
                         }
                     }
                 };
+
                 OnAnimationEndListener endListener = new OnAnimationEndListener() {
                     @Override
                     public void onAnimationEnd(@NonNull DynamicAnimation animation, boolean canceled, float value, float velocity) {
@@ -610,14 +618,14 @@ public class TouchUtils {
                         animation.removeEndListener(this);
                     }
                 };
-                flingX.setStartVelocity(vx)
-                        .addEndListener(endListener)
-                        .addUpdateListener(updateListener)
-                        .start();
-                flingY.setStartVelocity(vy)
-                        .addEndListener(endListener)
-                        .addUpdateListener(updateListener)
-                        .start();
+
+                if (Math.abs(vx) > Math.abs(vy)) {
+                    flingX.addUpdateListener(updateListener);
+                } else {
+                    flingY.addUpdateListener(updateListener);
+                }
+                flingX.setStartVelocity(vx).addEndListener(endListener).start();
+                flingY.setStartVelocity(vy).addEndListener(endListener).start();
                 // release tracker
                 velocityTracker.recycle();
                 velocityTracker = null;
@@ -677,6 +685,10 @@ public class TouchUtils {
             return true;
         }
 
+        protected int getMaximumFlingVelocity(View view) {
+            return 0;
+        }
+
         protected FloatPropertyCompat<View> getPropX() {
             return DynamicAnimation.X;
         }
@@ -699,6 +711,10 @@ public class TouchUtils {
 
         protected float getFrictionY() {
             return 1.5f;
+        }
+
+        protected int getPercentVelocityToStopMove() {
+            return 25;
         }
 
         /* -------------------------------- PRIVATE AREA ---------------------------------------- */

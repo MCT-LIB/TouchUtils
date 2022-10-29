@@ -8,8 +8,10 @@ import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
@@ -26,6 +28,8 @@ public class MainActivity extends AppCompatActivity {
 
     static boolean isAdd;
 
+    BubbleBaseLayout baseLayout;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -35,7 +39,7 @@ public class MainActivity extends AppCompatActivity {
         requestOverlayPermission(this, (allGranted, grantedList, deniedList) -> {
             if (allGranted && !isAdd) {
                 isAdd = true;
-                BubbleBaseLayout baseLayout = new BubbleBaseLayout(MainActivity.this);
+                baseLayout = new BubbleBaseLayout(MainActivity.this);
                 View view = new View(MainActivity.this);
                 baseLayout.addView(view);
 
@@ -76,6 +80,13 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                 });
+            }
+        });
+
+        findViewById(R.id.btnClear).setOnClickListener(v -> {
+            if (baseLayout != null) {
+                baseLayout.detachFromWindow();
+                baseLayout = null;
             }
         });
 
@@ -163,7 +174,9 @@ public class MainActivity extends AppCompatActivity {
             // | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
         } else {
             return WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                    | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
+                    | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                    | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                    ;
         }
     }
 
