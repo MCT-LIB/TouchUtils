@@ -505,6 +505,7 @@ public class TouchUtils {
 
     public static abstract class FlingMoveToWallListener extends BaseTouchListener {
 
+        private int minimumFlingVelocity;
         private int maximumFlingVelocity;
 
         private boolean isInit;
@@ -522,6 +523,7 @@ public class TouchUtils {
             isInit = true;
             setArea(v, initArea(v));
             animArea = initAnimArea(v);
+            minimumFlingVelocity = getMinimumFlingVelocity(v);
             int maxFling = getMaximumFlingVelocity(v);
             maximumFlingVelocity = maxFling <= 0
                     ? ViewConfiguration.get(v.getContext()).getScaledMaximumFlingVelocity()
@@ -581,7 +583,8 @@ public class TouchUtils {
                 vx = coerceIn(velocityTracker.getXVelocity(), -maximumFlingVelocity, maximumFlingVelocity);
                 vy = coerceIn(velocityTracker.getYVelocity(), -maximumFlingVelocity, maximumFlingVelocity);
                 // make sure the velocity > 0
-                if (vx == 0 && vy == 0) {
+                Log.e(TAG, "onActionStop: " + vx + " " + vy);
+                if (Math.abs(vx) < minimumFlingVelocity && Math.abs(vy) < minimumFlingVelocity) {
                     moveToWall(view);
                     return onStop(view, event);
                 }
@@ -683,6 +686,10 @@ public class TouchUtils {
 
         protected boolean onStop(View view, MotionEvent event) {
             return true;
+        }
+
+        protected int getMinimumFlingVelocity(View view) {
+            return 0;
         }
 
         protected int getMaximumFlingVelocity(View view) {
