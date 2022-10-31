@@ -1,4 +1,4 @@
-package com.mct.test;
+package com.mct.touchutils.test;
 
 import android.content.Context;
 import android.util.AttributeSet;

@@ -1,4 +1,4 @@
-package com.mct.test;
+package com.mct.touchutils.test;
 
 import android.Manifest;
 import android.content.Context;
@@ -8,10 +8,8 @@ import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
-import android.view.ViewConfiguration;
 import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
@@ -19,7 +17,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.dynamicanimation.animation.FloatPropertyCompat;
 import androidx.fragment.app.FragmentActivity;
 
-import com.mct.touchutils.R;
 import com.mct.touchutils.TouchUtils;
 import com.permissionx.guolindev.PermissionX;
 import com.permissionx.guolindev.callback.RequestCallback;
@@ -72,11 +69,6 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     protected FloatPropertyCompat<View> getPropY() {
                         return BubbleBaseLayout.WINDOW_Y.getPropertyCompat();
-                    }
-
-                    @Override
-                    protected float getFrictionY() {
-                        return 2;
                     }
 
                 });

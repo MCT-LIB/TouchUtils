@@ -12,11 +12,11 @@ import android.view.animation.OvershootInterpolator;
 import android.view.animation.ScaleAnimation;
 
 import androidx.annotation.IntDef;
+import androidx.annotation.IntRange;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.dynamicanimation.animation.DynamicAnimation;
 import androidx.dynamicanimation.animation.DynamicAnimation.OnAnimationEndListener;
-import androidx.dynamicanimation.animation.DynamicAnimation.OnAnimationUpdateListener;
-import androidx.dynamicanimation.animation.FlingAnimation;
 import androidx.dynamicanimation.animation.FloatPropertyCompat;
 import androidx.dynamicanimation.animation.SpringAnimation;
 import androidx.dynamicanimation.animation.SpringForce;
@@ -33,8 +33,18 @@ public class TouchUtils {
     public static final int BOT_LEFT = 2;
     public static final int BOT_RIGHT = 3;
 
+    public static final int LEFT = 0;
+    public static final int TOP = 1;
+    public static final int RIGHT = 2;
+    public static final int BOT = 3;
+    public static final int UNSET = 4;
+
     @IntDef({TOP_LEFT, TOP_RIGHT, BOT_LEFT, BOT_RIGHT})
     public @interface Corner {
+    }
+
+    @IntDef({LEFT, TOP, RIGHT, BOT})
+    public @interface Wall {
     }
 
     public static final int TYPE_GROW = 0;
@@ -155,58 +165,46 @@ public class TouchUtils {
 
     }
 
-    public static abstract class TouchMoveCornerListener extends BaseTouchListener {
+    public static abstract class FlingMoveListener extends BaseTouchListener {
 
         private static final int MIN_TAP_TIME = 1000;
-        private static final int MIN_FLING_TIME = 250;
-        private static final int THRESHOLD_VELOCITY_X = 400;
-        private static final int THRESHOLD_VELOCITY_Y = 430;
-        private static final int FLING_DISTANCE_PASS_PERCENT = 1;
-
-        private static final int UNKNOWN = -1;
-        private static final int LEFT = 1;
-        private static final int UP = 2;
-        private static final int RIGHT = 3;
-        private static final int DOWN = 4;
+        private int maximumFlingVelocity;
 
         private boolean isInit;
         private Rect area, moveArea;
         private SpringAnimation springX, springY;
         private VelocityTracker velocityTracker;
-        private int minimumFlingVelocity;
-        private int maximumFlingVelocity;
-
         private float dX, dY;
-        private Point beginPosition;
 
         @NonNull
         protected abstract Rect initArea(View view);
 
+        protected abstract boolean isCanClick(View view);
+
+        protected abstract void handleFling(View view, @Nullable Point predictPosition);
+
         @Override
-        public void init(@NonNull View v) {
+        public void init(View v) {
             isInit = true;
             setArea(v, initArea(v));
-            minimumFlingVelocity = ViewConfiguration.get(v.getContext()).getScaledMinimumFlingVelocity();
-            maximumFlingVelocity = ViewConfiguration.get(v.getContext()).getScaledMaximumFlingVelocity();
-
             Rect animArea = initAnimArea(v);
+
+            maximumFlingVelocity = ViewConfiguration.get(v.getContext()).getScaledMaximumFlingVelocity();
             springX = new SpringAnimation(v, getPropX(), 0);
-            springY = new SpringAnimation(v, getPropY(), 0);
             springX.setMinValue(animArea.left);
             springX.setMaxValue(animArea.right);
+            springY = new SpringAnimation(v, getPropY(), 0);
             springY.setMinValue(animArea.top);
             springY.setMaxValue(animArea.bottom);
-
-            resetForce(false);
         }
 
         @Override
-        protected final void onActionTouch(@NonNull View view, @NonNull MotionEvent event) {
-            super.onActionTouch(view, event);
+        protected void onActionTouch(@NonNull View view, @NonNull MotionEvent event) {
+            event.offsetLocation(getPropX().getValue(view), getPropY().getValue(view));
         }
 
         @Override
-        protected final boolean onActionDown(@NonNull View view, @NonNull MotionEvent event) {
+        protected boolean onActionDown(@NonNull View view, @NonNull MotionEvent event) {
             if (!isInit) init(view);
             if (velocityTracker == null) {
                 velocityTracker = VelocityTracker.obtain();
@@ -214,14 +212,13 @@ public class TouchUtils {
             velocityTracker.addMovement(event);
             dX = getPropX().getValue(view) - event.getRawX();
             dY = getPropY().getValue(view) - event.getRawY();
-            beginPosition = getCenter(view, getPropX(), getPropY());
             resetForce(false);
             clearAnimation();
             return onDown(view, event);
         }
 
         @Override
-        protected final boolean onActionMove(@NonNull View view, @NonNull MotionEvent event) {
+        protected boolean onActionMove(@NonNull View view, @NonNull MotionEvent event) {
             velocityTracker.addMovement(event);
             float x = event.getRawX() + dX;
             float y = event.getRawY() + dY;
@@ -231,48 +228,39 @@ public class TouchUtils {
             }
             springX.animateToFinalPosition(x);
             springY.animateToFinalPosition(y);
-
-            if (getState() == STATE_MOVE) {
+            if (isTouching()) {
                 return onMove(view, event);
             }
             return true;
         }
 
         @Override
-        protected final boolean onActionStop(@NonNull View view, @NonNull MotionEvent event) {
+        protected boolean onActionStop(@NonNull View view, @NonNull MotionEvent event) {
             long eventTime = event.getEventTime() - event.getDownTime();
-            boolean isHandleClick = false;
-            if (event.getAction() == MotionEvent.ACTION_UP) {
-                if (getState() == STATE_DOWN) {
-                    boolean canClick = true;
-                    if (isOnlyCornerCanClick()) {
-                        canClick = isNearCornerPoint(new Point(
-                                (int) getPropX().getValue(view),
-                                (int) getPropY().getValue(view)), moveArea);
-                    }
-                    if (canClick) {
-                        if (eventTime <= getMinTapTime()) {
-                            Log.d(TAG, "onActionStop: PERFORM CLICK");
-                            view.performClick();
-                        } else {
-                            Log.d(TAG, "onActionStop: PERFORM LONG CLICK");
-                            view.performLongClick();
-                        }
-                    } else {
-                        Log.d(TAG, "onActionStop: NOT NEAR CORNER -> BLOCK CLICK");
-                    }
-                    isHandleClick = true;
+            boolean isHandleClick = !isTouching() && isCanClick(view);
+            Point predictPosition = null;
+            if (isHandleClick) {
+                if (eventTime <= getMinTapTime()) {
+                    view.performClick();
+                } else {
+                    view.performLongClick();
+                }
+            } else {
+                if (velocityTracker != null) {
+                    // compute velocity
+                    velocityTracker.computeCurrentVelocity(1000, maximumFlingVelocity);
+                    // handle velocity
+                    float vx = velocityTracker.getXVelocity() * (100 - getLostVelocityPercent()) / 100;
+                    float vy = velocityTracker.getYVelocity() * (100 - getLostVelocityPercent()) / 100;
+                    predictPosition = new Point(
+                            (int) coerceIn(getPropX().getValue(view) + vx, moveArea.left, moveArea.right),
+                            (int) coerceIn(getPropY().getValue(view) + vy, moveArea.top, moveArea.bottom)
+                    );
                 }
             }
-            if (!isHandleClick && eventTime < getMinFlingTime()) {
-                Log.d(TAG, "onActionStop: HANDLE SWIPE");
-                handleFling(view);
-            } else {
-                Log.d(TAG, "onActionStop: MOVE TO CORNER");
-                moveToCorner(view);
-            }
-            velocityTracker.recycle();
-            velocityTracker = null;
+            resetForce(true);
+            handleFling(view, predictPosition);
+            releaseTracker();
             return onStop(view, event);
         }
 
@@ -291,6 +279,19 @@ public class TouchUtils {
             return new Rect(area);
         }
 
+        @NonNull
+        protected final Rect getMoveArea() {
+            return new Rect(moveArea);
+        }
+
+        public final SpringAnimation getSpringX() {
+            return springX;
+        }
+
+        public final SpringAnimation getSpringY() {
+            return springY;
+        }
+
         protected final void clearAnimation() {
             if (isInit) {
                 springX.cancel();
@@ -302,7 +303,7 @@ public class TouchUtils {
 
         /**
          * This func can control min and max position
-         * when anim move to corner
+         * when anim move to predict position
          */
         @NonNull
         protected Rect initAnimArea(@NonNull View view) {
@@ -328,53 +329,6 @@ public class TouchUtils {
             return true;
         }
 
-        protected void onMovedToCorner(@NonNull View view, @Corner int corner, Point cornerPoint) {
-        }
-
-        protected boolean isOnlyCornerCanClick() {
-            return true;
-        }
-
-        protected boolean isCanMoveOutArea() {
-            return true;
-        }
-
-        protected float getStiffnessX() {
-            return SpringForce.STIFFNESS_VERY_LOW;
-        }
-
-        protected float getStiffnessY() {
-            return SpringForce.STIFFNESS_VERY_LOW;
-        }
-
-        protected float getDampingRatioX() {
-            return SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY;
-        }
-
-        protected float getDampingRatioY() {
-            return SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY;
-        }
-
-        protected int getMinTapTime() {
-            return MIN_TAP_TIME;
-        }
-
-        protected int getMinFlingTime() {
-            return MIN_FLING_TIME;
-        }
-
-        protected int getThresholdVelocityX() {
-            return THRESHOLD_VELOCITY_X;
-        }
-
-        protected int getThresholdVelocityY() {
-            return THRESHOLD_VELOCITY_Y;
-        }
-
-        protected int getFlingDistancePassPercent() {
-            return FLING_DISTANCE_PASS_PERCENT;
-        }
-
         protected FloatPropertyCompat<View> getPropX() {
             return DynamicAnimation.X;
         }
@@ -383,10 +337,43 @@ public class TouchUtils {
             return DynamicAnimation.Y;
         }
 
+        protected float getStiffnessX() {
+            return 150;
+        }
+
+        protected float getDampingRatioX() {
+            return 0.6f;
+        }
+
+        protected float getStiffnessY() {
+            return 150;
+        }
+
+        protected float getDampingRatioY() {
+            return 0.6f;
+        }
+
+        protected boolean isCanMoveOutArea() {
+            return true;
+        }
+
+        protected boolean isMovingCanClick() {
+            return false;
+        }
+
+        @IntRange(from = 0, to = 100)
+        protected int getLostVelocityPercent() {
+            return 90;
+        }
+
+        protected int getMinTapTime() {
+            return MIN_TAP_TIME;
+        }
+
         /* -------------------------------- PRIVATE AREA ---------------------------------------- */
 
-        private void resetForce(boolean isMoveToCorner) {
-            if (isMoveToCorner) {
+        private void resetForce(boolean isMoveToPredictPosition) {
+            if (isMoveToPredictPosition) {
                 springX.getSpring().setDampingRatio(getDampingRatioX()).setStiffness(getStiffnessX());
                 springY.getSpring().setDampingRatio(getDampingRatioY()).setStiffness(getStiffnessY());
             } else {
@@ -397,343 +384,167 @@ public class TouchUtils {
             }
         }
 
-        private void handleFling(@NonNull View view) {
-            int vx = 0, vy = 0;
-
+        private void releaseTracker() {
+            // release tracker
             if (velocityTracker != null) {
-                velocityTracker.computeCurrentVelocity(1000, maximumFlingVelocity);
-                vx = (int) velocityTracker.getXVelocity();
-                vy = (int) velocityTracker.getYVelocity();
-                if (Math.abs(vx) < minimumFlingVelocity) {
-                    vx = 0;
-                }
-                if (Math.abs(vy) < minimumFlingVelocity) {
-                    vy = 0;
-                }
+                velocityTracker.recycle();
+                velocityTracker = null;
             }
-            Point currPosition = getCenter(view, getPropX(), getPropY());
-            final int distanceX = currPosition.x - beginPosition.x;
-            final int distanceY = currPosition.y - beginPosition.y;
-
-            boolean vxPass = Math.abs(vx) > minimumFlingVelocity + getThresholdVelocityX();
-            boolean vyPass = Math.abs(vy) > minimumFlingVelocity + getThresholdVelocityY();
-            boolean dxPass = 100f * Math.abs(distanceX) / area.width() > getFlingDistancePassPercent();
-            boolean dyPass = 100f * Math.abs(distanceY) / area.height() > getFlingDistancePassPercent();
-
-            int directionVer; // LEFT | RIGHT | UNKNOWN
-            int directionHoz; // UP   | DOWN  | UNKNOWN
-            directionVer = vxPass && dxPass ? distanceX > 0 ? RIGHT : distanceX < 0 ? LEFT : UNKNOWN : UNKNOWN;
-            directionHoz = vyPass && dyPass ? distanceY > 0 ? DOWN : distanceY < 0 ? UP : UNKNOWN : UNKNOWN;
-
-            Log.d(TAG, "handleFling: " +
-                    vx + " | " + vy + " | " +
-                    directionVer + " | " + directionHoz);
-
-            Integer corner;
-            switch (directionVer) {
-                case LEFT:
-                    if (directionHoz == UP) {
-                        corner = TOP_LEFT;
-                        break;
-                    }
-                    if (directionHoz == DOWN) {
-                        corner = BOT_LEFT;
-                        break;
-                    }
-                    corner = beginPosition.y < area.height() / 2 ? TOP_LEFT : BOT_LEFT;
-                    break;
-                case RIGHT:
-                    if (directionHoz == UP) {
-                        corner = TOP_RIGHT;
-                        break;
-                    }
-                    if (directionHoz == DOWN) {
-                        corner = BOT_RIGHT;
-                        break;
-                    }
-                    corner = beginPosition.y < area.height() / 2 ? TOP_RIGHT : BOT_RIGHT;
-                    break;
-                case UNKNOWN:
-                    if (directionHoz == UP) {
-                        corner = beginPosition.x < area.width() / 2 ? TOP_LEFT : TOP_RIGHT;
-                        break;
-                    }
-                    if (directionHoz == DOWN) {
-                        corner = beginPosition.x < area.width() / 2 ? BOT_LEFT : BOT_RIGHT;
-                        break;
-                    }
-                default:
-                    corner = null;
-                    break;
-            }
-            if (corner != null) {
-                moveToCorner(view, corner);
-            } else {
-                moveToCorner(view);
-            }
-        }
-
-        @Corner
-        protected final int getCorner(View view) {
-            return calcCorner(getCenter(view, getPropX(), getPropY()), area);
-        }
-
-        protected final void moveToCorner(View view) {
-            moveToCorner(view, getCorner(view));
-        }
-
-        protected final void moveToCorner(@NonNull View view, @Corner int corner) {
-            Point cornerPoint = TouchUtils.getCorner(moveArea, corner);
-            OnAnimationEndListener endListener = new OnAnimationEndListener() {
-                @Override
-                public void onAnimationEnd(DynamicAnimation animation, boolean canceled, float value, float velocity) {
-                    if (!canceled && !springX.isRunning() && !springY.isRunning()) {
-                        onMovedToCorner(view, corner, cornerPoint);
-                    }
-                    if (!springX.isRunning()) springX.removeEndListener(this);
-                    if (!springY.isRunning()) springY.removeEndListener(this);
-                }
-            };
-            resetForce(true);
-            springX.addEndListener(endListener);
-            springY.addEndListener(endListener);
-            springX.animateToFinalPosition(cornerPoint.x);
-            springY.animateToFinalPosition(cornerPoint.y);
         }
 
     }
 
-    public static abstract class FlingMoveToWallListener extends BaseTouchListener {
-
-        private int minimumFlingVelocity;
-        private int maximumFlingVelocity;
-
-        private boolean isInit;
-        private Rect area, moveArea, animArea;
-        private SpringAnimation springX;
-        private FlingAnimation flingX, flingY;
-        private VelocityTracker velocityTracker;
-        private float dX, dY;
-
-        @NonNull
-        protected abstract Rect initArea(View view);
+    public static abstract class FlingMoveCornerListener extends FlingMoveListener {
 
         @Override
-        public void init(View v) {
-            isInit = true;
-            setArea(v, initArea(v));
-            animArea = initAnimArea(v);
-            minimumFlingVelocity = getMinimumFlingVelocity(v);
-            int maxFling = getMaximumFlingVelocity(v);
-            maximumFlingVelocity = maxFling <= 0
-                    ? ViewConfiguration.get(v.getContext()).getScaledMaximumFlingVelocity()
-                    : maxFling;
-            springX = new SpringAnimation(v, getPropX(), 0);
-            springX.setMinValue(animArea.left);
-            springX.setMaxValue(animArea.right);
-            springX.getSpring().setDampingRatio(getDampingRatioX()).setStiffness(getStiffnessX());
-            flingX = new FlingAnimation(v, getPropX());
-            flingX.setMinValue(animArea.left);
-            flingX.setMaxValue(animArea.right);
-            flingX.setFriction(getFrictionX());
-            flingY = new FlingAnimation(v, getPropY());
-            flingY.setMinValue(animArea.top);
-            flingY.setMaxValue(animArea.bottom);
-            flingY.setFriction(getFrictionY());
+        protected boolean isCanClick(View view) {
+            return isMovingCanClick() || isNearCornerPoint(new Point(
+                    (int) getPropX().getValue(view),
+                    (int) getPropY().getValue(view)), getMoveArea());
         }
 
         @Override
-        protected final void onActionTouch(@NonNull View view, @NonNull MotionEvent event) {
-            event.offsetLocation(getPropX().getValue(view), getPropY().getValue(view));
+        protected void handleFling(View view, Point predictPosition) {
+            moveToCorner(view, getCorner(view, predictPosition));
         }
 
-        @Override
-        protected final boolean onActionDown(@NonNull View view, @NonNull MotionEvent event) {
-            if (!isInit) init(view);
-            if (velocityTracker == null) {
-                velocityTracker = VelocityTracker.obtain();
-            }
-            velocityTracker.addMovement(event);
-            dX = getPropX().getValue(view) - event.getRawX();
-            dY = getPropY().getValue(view) - event.getRawY();
-            clearAnimation();
-            return onDown(view, event);
+        @Corner
+        protected int getCorner(View view) {
+            return getCorner(view, null);
         }
 
-        @Override
-        protected final boolean onActionMove(@NonNull View view, @NonNull MotionEvent event) {
-            velocityTracker.addMovement(event);
-            float x = coerceIn(event.getRawX() + dX, moveArea.left, moveArea.right);
-            float y = coerceIn(event.getRawY() + dY, moveArea.top, moveArea.bottom);
-            getPropX().setValue(view, x);
-            getPropY().setValue(view, y);
-            if (getState() == STATE_MOVE) {
-                return onMove(view, event);
-            }
-            return true;
+        @Corner
+        protected int getCorner(View view, @Nullable Point predictPosition) {
+            return predictPosition == null
+                    ? calcCorner(getCenter(view, getPropX(), getPropY()), getArea())
+                    : calcCorner(getCenter(view, predictPosition), getArea());
         }
 
-        @Override
-        protected final boolean onActionStop(@NonNull View view, @NonNull MotionEvent event) {
-            if (velocityTracker != null) {
-                // compute velocity
-                velocityTracker.computeCurrentVelocity(1000);
-                float vx, vy;
-                // handle velocity
-                vx = coerceIn(velocityTracker.getXVelocity(), -maximumFlingVelocity, maximumFlingVelocity);
-                vy = coerceIn(velocityTracker.getYVelocity(), -maximumFlingVelocity, maximumFlingVelocity);
-                // make sure the velocity > 0
-                Log.e(TAG, "onActionStop: " + vx + " " + vy);
-                if (Math.abs(vx) < minimumFlingVelocity && Math.abs(vy) < minimumFlingVelocity) {
-                    moveToWall(view);
-                    return onStop(view, event);
-                }
-                // fling move listener
-                OnAnimationUpdateListener updateListener = new OnAnimationUpdateListener() {
-
-                    final float minVelocityToStop =
-                            Math.max(Math.abs(vx), Math.abs(vy)) * getPercentVelocityToStopMove() / 100;
-
-                    @Override
-                    public void onAnimationUpdate(DynamicAnimation animation, float val, float velocity) {
-                        if (Math.abs(velocity) < minVelocityToStop
-                                || val == animArea.left
-                                || val == animArea.top
-                                || val == animArea.right
-                                || val == animArea.bottom
-                        ) {
-                            flingX.cancel();
-                            flingX.removeUpdateListener(this);
-                            flingY.removeUpdateListener(this);
-                            springX.setStartVelocity(vx / 10);
-                            moveToWall(view);
-                        }
+        protected void moveToCorner(@NonNull View view, @Corner int corner) {
+            Point cornerPoint = TouchUtils.getCorner(getMoveArea(), corner);
+            OnAnimationEndListener endListener = new OnAnimationEndListener() {
+                @Override
+                public void onAnimationEnd(DynamicAnimation animation, boolean canceled, float value, float velocity) {
+                    if (!canceled && !getSpringX().isRunning() && !getSpringY().isRunning()) {
+                        onMovedToCorner(view, corner, cornerPoint);
                     }
-                };
-
-                OnAnimationEndListener endListener = new OnAnimationEndListener() {
-                    @Override
-                    public void onAnimationEnd(@NonNull DynamicAnimation animation, boolean canceled, float value, float velocity) {
-                        if (!canceled && !flingX.isRunning() && !flingY.isRunning()) {
-                            moveToWall(view);
-                        }
-                        animation.removeUpdateListener(updateListener);
-                        animation.removeEndListener(this);
-                    }
-                };
-
-                if (Math.abs(vx) > Math.abs(vy)) {
-                    flingX.addUpdateListener(updateListener);
-                } else {
-                    flingY.addUpdateListener(updateListener);
+                    if (!getSpringX().isRunning()) getSpringX().removeEndListener(this);
+                    if (!getSpringY().isRunning()) getSpringY().removeEndListener(this);
                 }
-                flingX.setStartVelocity(vx).addEndListener(endListener).start();
-                flingY.setStartVelocity(vy).addEndListener(endListener).start();
-                // release tracker
-                velocityTracker.recycle();
-                velocityTracker = null;
-            }
-            return onStop(view, event);
+            };
+            getSpringX().addEndListener(endListener).animateToFinalPosition(cornerPoint.x);
+            getSpringY().addEndListener(endListener).animateToFinalPosition(cornerPoint.y);
         }
 
-        protected final void setArea(@NonNull View v, @NonNull Rect rect) {
-            if (rect.equals(area)) {
-                return;
+        protected void onMovedToCorner(@NonNull View view, @Corner int corner, Point cornerPoint) {
+        }
+
+    }
+
+    public static abstract class FlingMoveToWallListener extends FlingMoveListener {
+
+        public enum MoveMode {
+            Left(LEFT), Top(TOP), Right(RIGHT), Bot(BOT),
+            Vertical(UNSET),   // doc
+            Horizontal(UNSET), // ngang
+            Nearest(UNSET);    // auto
+            @Wall
+            private final int wall;
+
+            MoveMode(int wall) {
+                this.wall = wall;
             }
-            int right = rect.right - v.getWidth();
-            int bottom = rect.bottom - v.getHeight();
-            area = rect;
-            moveArea = new Rect(area.left, area.top, right, bottom);
+        }
+
+        @Override
+        protected boolean isCanClick(View view) {
+            return isMovingCanClick() || isNearWallPoint(new Point(
+                    (int) getPropX().getValue(view),
+                    (int) getPropY().getValue(view)), getMoveArea());
+        }
+
+        @Override
+        protected void handleFling(View view, Point predictPosition) {
+            moveToWall(view, predictPosition);
+        }
+
+        @Wall
+        protected int getWall(View view) {
+            return getWall(view, null);
+        }
+
+        @Wall
+        protected int getWall(View view, @Nullable Point predictPosition) {
+            MoveMode mode = getMoveMode();
+            if (mode.wall != UNSET) {
+                return mode.wall;
+            }
+            Rect moveArea = getMoveArea();
+            float centerAreaX = moveArea.exactCenterX();
+            float centerAreaY = moveArea.exactCenterY();
+            Point centerView = predictPosition == null
+                    ? getCenter(view, getPropX(), getPropY())
+                    : getCenter(view, predictPosition);
+            switch (mode) {
+                default:
+                case Vertical:
+                    return centerView.x < centerAreaX ? LEFT : RIGHT;
+                case Horizontal:
+                    return centerView.y < centerAreaY ? TOP : BOT;
+                case Nearest:
+                    int predictWallVer = centerView.x < centerAreaX ? LEFT : RIGHT;
+                    int predictWallHoz = centerView.y < centerAreaY ? TOP : BOT;
+
+                    int predictX = predictWallVer == LEFT ? moveArea.left : moveArea.right;
+                    int predictY = predictWallHoz == TOP ? moveArea.top : moveArea.bottom;
+                    float distanceToVer = Math.abs(centerView.x - predictX);
+                    float distanceToHoz = Math.abs(centerView.y - predictY);
+
+                    return distanceToVer / moveArea.width() > distanceToHoz / moveArea.height() ?
+                            predictWallHoz :
+                            predictWallVer;
+            }
+        }
+
+        protected void moveToWall(View view, Point predictPosition) {
+            Rect moveArea = getMoveArea();
+            Point wallPoint = new Point();
+            int wall = getWall(view, predictPosition);
+            switch (wall) {
+                case LEFT:
+                case RIGHT:
+                    wallPoint.x = wall == LEFT ? moveArea.left : moveArea.right;
+                    wallPoint.y = predictPosition == null ? (int) getPropY().getValue(view) : predictPosition.y;
+                    break;
+                case TOP:
+                case BOT:
+                    wallPoint.x = predictPosition == null ? (int) getPropX().getValue(view) : predictPosition.x;
+                    wallPoint.y = wall == TOP ? moveArea.top : moveArea.bottom;
+                    break;
+            }
+
+            OnAnimationEndListener endListener = new OnAnimationEndListener() {
+                @Override
+                public void onAnimationEnd(DynamicAnimation animation, boolean canceled, float value, float velocity) {
+                    if (!canceled && !getSpringX().isRunning() && !getSpringY().isRunning()) {
+                        onMovedToWall(view, wall, wallPoint);
+                    }
+                    if (!getSpringX().isRunning()) getSpringX().removeEndListener(this);
+                    if (!getSpringY().isRunning()) getSpringY().removeEndListener(this);
+                }
+            };
+            getSpringX().addEndListener(endListener).animateToFinalPosition(wallPoint.x);
+            getSpringY().addEndListener(endListener).animateToFinalPosition(wallPoint.y);
         }
 
         @NonNull
-        protected final Rect getArea() {
-            return new Rect(area);
+        protected MoveMode getMoveMode() {
+            return MoveMode.Vertical;
         }
 
-        protected final void clearAnimation() {
-            if (isInit) {
-                springX.cancel();
-                flingX.cancel();
-                flingY.cancel();
-            }
+        protected void onMovedToWall(@NonNull View view, @Wall int wall, Point wallPoint) {
         }
 
-        /* ----------------- CAN OVERRIDE TO RECEIVE OR MODIFY ---------------------------------- */
-
-        /**
-         * This func can control min and max position
-         * when anim move to corner
-         */
-        @NonNull
-        protected Rect initAnimArea(@NonNull View view) {
-            int offsetX = (int) (view.getWidth() * 0.9f);
-            return new Rect(
-                    area.left - offsetX,
-                    area.top,
-                    area.right - view.getWidth() + offsetX,
-                    area.bottom - view.getHeight()
-            );
-        }
-
-        protected boolean onDown(View view, MotionEvent event) {
-            return true;
-        }
-
-        protected boolean onMove(View view, MotionEvent event) {
-            return true;
-        }
-
-        protected boolean onStop(View view, MotionEvent event) {
-            return true;
-        }
-
-        protected int getMinimumFlingVelocity(View view) {
-            return 0;
-        }
-
-        protected int getMaximumFlingVelocity(View view) {
-            return 0;
-        }
-
-        protected FloatPropertyCompat<View> getPropX() {
-            return DynamicAnimation.X;
-        }
-
-        protected FloatPropertyCompat<View> getPropY() {
-            return DynamicAnimation.Y;
-        }
-
-        protected float getStiffnessX() {
-            return SpringForce.STIFFNESS_VERY_LOW;
-        }
-
-        protected float getDampingRatioX() {
-            return 0.4f;
-        }
-
-        protected float getFrictionX() {
-            return 1.5f;
-        }
-
-        protected float getFrictionY() {
-            return 1.5f;
-        }
-
-        protected int getPercentVelocityToStopMove() {
-            return 25;
-        }
-
-        /* -------------------------------- PRIVATE AREA ---------------------------------------- */
-
-        private void moveToWall(View view) {
-            float centerX = getCenter(view, getPropX(), getPropY()).x;
-            float centerAreaX = area.right / 2f;
-            float nearestXWall = centerX >= centerAreaX
-                    ? moveArea.right
-                    : moveArea.left;
-            springX.animateToFinalPosition(nearestXWall);
-        }
     }
 
     public static class TouchScaleListener extends BaseTouchListener {
@@ -877,6 +688,13 @@ public class TouchUtils {
     }
 
     @NonNull
+    private static Point getCenter(@NonNull View view, @NonNull Point pos) {
+        return new Point(
+                pos.x + (view.getWidth() / 2),
+                pos.y + (view.getHeight() / 2));
+    }
+
+    @NonNull
     private static Point getCorner(Rect area, @Corner int corner) {
         switch (corner) {
             case TOP_LEFT:
@@ -894,7 +712,7 @@ public class TouchUtils {
     private static boolean isNearCornerPoint(@NonNull Point p, @NonNull Rect area) {
         List<Pair<Integer, Double>> cornerDistances = getCornerDistances(p, area);
         for (Pair<Integer, Double> cornerDistance : cornerDistances) {
-            if (cornerDistance.second <= 5) {
+            if (cornerDistance.second <= 8) {
                 return true;
             }
         }
@@ -902,9 +720,9 @@ public class TouchUtils {
     }
 
     /**
-     * @return </br>first: corner from 0 -> 4:
-     * </br>second: minDistance
-     * </br>See Also: ${{@link Corner}}
+     * @return first: corner from 0 -> 4:
+     * <br/>second: minDistance
+     * <br/>See Also: ${@link Corner}
      */
     @Corner
     private static int calcCorner(Point p, @NonNull Rect area) {
@@ -933,6 +751,29 @@ public class TouchUtils {
         cornerDistances.add(new Pair<>(BOT_RIGHT, distance(p, br)));
         return cornerDistances;
     }
+
+    private static boolean isNearWallPoint(@NonNull Point p, @NonNull Rect area) {
+        List<Pair<Integer, Double>> cornerDistances = getWallDistances(p, area);
+        for (Pair<Integer, Double> cornerDistance : cornerDistances) {
+            if (cornerDistance.second <= 8) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @NonNull
+    private static List<Pair<Integer, Double>> getWallDistances(@NonNull Point p, @NonNull Rect area) {
+        Point l = new Point(area.left, p.y);
+        Point r = new Point(area.right, p.y);
+
+        List<Pair<Integer, Double>> wallDistances = new ArrayList<>();
+        wallDistances.add(new Pair<>(LEFT, distance(p, l)));
+        wallDistances.add(new Pair<>(RIGHT, distance(p, r)));
+
+        return wallDistances;
+    }
+
 
     private static double distance(@NonNull Point a, @NonNull Point b) {
         int dx = a.x - b.x;
