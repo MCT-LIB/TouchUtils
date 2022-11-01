@@ -326,6 +326,18 @@ public class TouchUtils {
             }
         }
 
+        protected final void resetForce(boolean isMoveToPredictPosition) {
+            if (isMoveToPredictPosition) {
+                springX.getSpring().setDampingRatio(getDampingRatioX()).setStiffness(getStiffnessX());
+                springY.getSpring().setDampingRatio(getDampingRatioY()).setStiffness(getStiffnessY());
+            } else {
+                float dampingRatio = SpringForce.DAMPING_RATIO_NO_BOUNCY;
+                float stiffness = SpringForce.STIFFNESS_HIGH;
+                springX.getSpring().setDampingRatio(dampingRatio).setStiffness(stiffness);
+                springY.getSpring().setDampingRatio(dampingRatio).setStiffness(stiffness);
+            }
+        }
+
         /* ----------------- CAN OVERRIDE TO RECEIVE OR MODIFY ---------------------------------- */
 
         /**
@@ -395,20 +407,6 @@ public class TouchUtils {
 
         protected int getMinTapTime() {
             return MIN_TAP_TIME;
-        }
-
-        /* -------------------------------- PRIVATE AREA ---------------------------------------- */
-
-        private void resetForce(boolean isMoveToPredictPosition) {
-            if (isMoveToPredictPosition) {
-                springX.getSpring().setDampingRatio(getDampingRatioX()).setStiffness(getStiffnessX());
-                springY.getSpring().setDampingRatio(getDampingRatioY()).setStiffness(getStiffnessY());
-            } else {
-                float dampingRatio = SpringForce.DAMPING_RATIO_NO_BOUNCY;
-                float stiffness = SpringForce.STIFFNESS_HIGH;
-                springX.getSpring().setDampingRatio(dampingRatio).setStiffness(stiffness);
-                springY.getSpring().setDampingRatio(dampingRatio).setStiffness(stiffness);
-            }
         }
 
     }
@@ -690,31 +688,31 @@ public class TouchUtils {
     }
 
     ///////////////////////////////////////////////////////////////////////////
-    // Below are private UTILS FUNC
+    // Below are UTILS FUNC
     ///////////////////////////////////////////////////////////////////////////
 
-    private static float coerceIn(float value, float min, float max) {
+    public static float coerceIn(float value, float min, float max) {
         return Math.min(Math.max(value, min), max);
     }
 
     @NonNull
-    private static Point getCenter(@NonNull View view,
-                                   @NonNull FloatPropertyCompat<View> propertyX,
-                                   @NonNull FloatPropertyCompat<View> propertyY) {
+    public static Point getCenter(@NonNull View view,
+                                  @NonNull FloatPropertyCompat<View> propertyX,
+                                  @NonNull FloatPropertyCompat<View> propertyY) {
         return new Point(
                 (int) (propertyX.getValue(view) + (view.getWidth() / 2)),
                 (int) (propertyY.getValue(view) + (view.getHeight() / 2)));
     }
 
     @NonNull
-    private static Point getCenter(@NonNull View view, @NonNull Point pos) {
+    public static Point getCenter(@NonNull View view, @NonNull Point pos) {
         return new Point(
                 pos.x + (view.getWidth() / 2),
                 pos.y + (view.getHeight() / 2));
     }
 
     @NonNull
-    private static Point getCorner(Rect area, @Corner int corner) {
+    public static Point getCorner(Rect area, @Corner int corner) {
         switch (corner) {
             case TOP_LEFT:
                 return new Point(area.left, area.top);
@@ -728,7 +726,7 @@ public class TouchUtils {
         return new Point();
     }
 
-    private static boolean isNearCornerPoint(@NonNull Point p, @NonNull Rect area) {
+    public static boolean isNearCornerPoint(@NonNull Point p, @NonNull Rect area) {
         List<Pair<Integer, Double>> cornerDistances = getCornerDistances(p, area);
         for (Pair<Integer, Double> cornerDistance : cornerDistances) {
             if (cornerDistance.second <= 8) {
@@ -744,7 +742,7 @@ public class TouchUtils {
      * <br/>See Also: ${@link Corner}
      */
     @Corner
-    private static int calcCorner(Point p, @NonNull Rect area) {
+    public static int calcCorner(Point p, @NonNull Rect area) {
         List<Pair<Integer, Double>> cornerDistances = getCornerDistances(p, area);
         Pair<Integer, Double> minDistance = cornerDistances.get(0);
         for (int i = 0; i < cornerDistances.size(); i++) {
@@ -757,7 +755,7 @@ public class TouchUtils {
     }
 
     @NonNull
-    private static List<Pair<Integer, Double>> getCornerDistances(@NonNull Point p, @NonNull Rect area) {
+    public static List<Pair<Integer, Double>> getCornerDistances(@NonNull Point p, @NonNull Rect area) {
         Point tl = new Point(area.left, area.top);
         Point tr = new Point(area.right, area.top);
         Point bl = new Point(area.left, area.bottom);
@@ -771,7 +769,7 @@ public class TouchUtils {
         return cornerDistances;
     }
 
-    private static boolean isNearWallPoint(@NonNull Point p, @NonNull Rect area) {
+    public static boolean isNearWallPoint(@NonNull Point p, @NonNull Rect area) {
         List<Pair<Integer, Double>> cornerDistances = getWallDistances(p, area);
         for (Pair<Integer, Double> cornerDistance : cornerDistances) {
             if (cornerDistance.second <= 8) {
@@ -782,7 +780,7 @@ public class TouchUtils {
     }
 
     @NonNull
-    private static List<Pair<Integer, Double>> getWallDistances(@NonNull Point p, @NonNull Rect area) {
+    public static List<Pair<Integer, Double>> getWallDistances(@NonNull Point p, @NonNull Rect area) {
         Point l = new Point(area.left, p.y);
         Point r = new Point(area.right, p.y);
 
@@ -794,7 +792,7 @@ public class TouchUtils {
     }
 
 
-    private static double distance(@NonNull Point a, @NonNull Point b) {
+    public static double distance(@NonNull Point a, @NonNull Point b) {
         int dx = a.x - b.x;
         int dy = a.y - b.y;
         return Math.sqrt(dx * dx + dy * dy);
