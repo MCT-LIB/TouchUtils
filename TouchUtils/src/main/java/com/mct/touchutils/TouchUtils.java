@@ -201,15 +201,15 @@ public class TouchUtils {
         @Override
         protected void onActionTouch(@NonNull View view, @NonNull MotionEvent event) {
             event.offsetLocation(getPropX().getValue(view), getPropY().getValue(view));
+            if (velocityTracker == null) {
+                velocityTracker = VelocityTracker.obtain();
+            }
+            velocityTracker.addMovement(event);
         }
 
         @Override
         protected boolean onActionDown(@NonNull View view, @NonNull MotionEvent event) {
             if (!isInit) init(view);
-            if (velocityTracker == null) {
-                velocityTracker = VelocityTracker.obtain();
-            }
-            velocityTracker.addMovement(event);
             dX = getPropX().getValue(view) - event.getRawX();
             dY = getPropY().getValue(view) - event.getRawY();
             resetForce(false);
@@ -219,7 +219,6 @@ public class TouchUtils {
 
         @Override
         protected boolean onActionMove(@NonNull View view, @NonNull MotionEvent event) {
-            velocityTracker.addMovement(event);
             float x = event.getRawX() + dX;
             float y = event.getRawY() + dY;
             if (!isCanMoveOutArea()) {
@@ -284,12 +283,24 @@ public class TouchUtils {
             return new Rect(moveArea);
         }
 
-        public final SpringAnimation getSpringX() {
+        protected final SpringAnimation getSpringX() {
             return springX;
         }
 
-        public final SpringAnimation getSpringY() {
+        protected final SpringAnimation getSpringY() {
             return springY;
+        }
+
+        protected final VelocityTracker getVelocityTracker() {
+            return velocityTracker;
+        }
+
+        protected final void releaseTracker() {
+            // release tracker
+            if (velocityTracker != null) {
+                velocityTracker.recycle();
+                velocityTracker = null;
+            }
         }
 
         protected final void clearAnimation() {
@@ -381,14 +392,6 @@ public class TouchUtils {
                 float stiffness = SpringForce.STIFFNESS_HIGH;
                 springX.getSpring().setDampingRatio(dampingRatio).setStiffness(stiffness);
                 springY.getSpring().setDampingRatio(dampingRatio).setStiffness(stiffness);
-            }
-        }
-
-        private void releaseTracker() {
-            // release tracker
-            if (velocityTracker != null) {
-                velocityTracker.recycle();
-                velocityTracker = null;
             }
         }
 
