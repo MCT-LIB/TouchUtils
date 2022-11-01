@@ -210,8 +210,8 @@ public class TouchUtils {
         @Override
         protected boolean onActionDown(@NonNull View view, @NonNull MotionEvent event) {
             if (!isInit) init(view);
-            dX = getPropX().getValue(view) - event.getRawX();
-            dY = getPropY().getValue(view) - event.getRawY();
+            setDownX(getPropX().getValue(view) - event.getRawX());
+            setDownY(getPropY().getValue(view) - event.getRawY());
             resetForce(false);
             clearAnimation();
             return onDown(view, event);
@@ -219,8 +219,8 @@ public class TouchUtils {
 
         @Override
         protected boolean onActionMove(@NonNull View view, @NonNull MotionEvent event) {
-            float x = event.getRawX() + dX;
-            float y = event.getRawY() + dY;
+            float x = event.getRawX() + getDownX();
+            float y = event.getRawY() + getDownY();
             if (!isCanMoveOutArea()) {
                 x = coerceIn(x, moveArea.left, moveArea.right);
                 y = coerceIn(y, moveArea.top, moveArea.bottom);
@@ -245,12 +245,12 @@ public class TouchUtils {
                     view.performLongClick();
                 }
             } else {
-                if (velocityTracker != null) {
+                if (getVelocityTracker() != null) {
                     // compute velocity
-                    velocityTracker.computeCurrentVelocity(1000, maximumFlingVelocity);
+                    getVelocityTracker().computeCurrentVelocity(1000, maximumFlingVelocity);
                     // handle velocity
-                    float vx = velocityTracker.getXVelocity() * (100 - getLostVelocityPercent()) / 100;
-                    float vy = velocityTracker.getYVelocity() * (100 - getLostVelocityPercent()) / 100;
+                    float vx = getVelocityTracker().getXVelocity() * (100 - getLostVelocityPercent()) / 100;
+                    float vy = getVelocityTracker().getYVelocity() * (100 - getLostVelocityPercent()) / 100;
                     predictPosition = new Point(
                             (int) coerceIn(getPropX().getValue(view) + vx, moveArea.left, moveArea.right),
                             (int) coerceIn(getPropY().getValue(view) + vy, moveArea.top, moveArea.bottom)
@@ -293,6 +293,22 @@ public class TouchUtils {
 
         protected final VelocityTracker getVelocityTracker() {
             return velocityTracker;
+        }
+
+        protected final float getDownX() {
+            return dX;
+        }
+
+        protected final void setDownX(float dX) {
+            this.dX = dX;
+        }
+
+        protected final float getDownY() {
+            return dY;
+        }
+
+        protected final void setDownY(float dY) {
+            this.dY = dY;
         }
 
         protected final void releaseTracker() {
