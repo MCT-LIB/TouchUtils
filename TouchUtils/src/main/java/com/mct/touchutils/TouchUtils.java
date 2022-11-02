@@ -168,6 +168,8 @@ public class TouchUtils {
     public static abstract class FlingMoveListener extends BaseTouchListener {
 
         private static final int MIN_TAP_TIME = 1000;
+        private static final float DEFAULT_STIFFNESS = SpringForce.STIFFNESS_HIGH;
+        private static final float DEFAULT_DAMPING_RATIO = SpringForce.DAMPING_RATIO_NO_BOUNCY;
         private int maximumFlingVelocity;
 
         private boolean isInit;
@@ -331,10 +333,9 @@ public class TouchUtils {
                 springX.getSpring().setDampingRatio(getDampingRatioX()).setStiffness(getStiffnessX());
                 springY.getSpring().setDampingRatio(getDampingRatioY()).setStiffness(getStiffnessY());
             } else {
-                float dampingRatio = SpringForce.DAMPING_RATIO_NO_BOUNCY;
-                float stiffness = SpringForce.STIFFNESS_HIGH;
-                springX.getSpring().setDampingRatio(dampingRatio).setStiffness(stiffness);
-                springY.getSpring().setDampingRatio(dampingRatio).setStiffness(stiffness);
+
+                springX.getSpring().setDampingRatio(getMoveDampingRatio()).setStiffness(getMoveStiffness());
+                springY.getSpring().setDampingRatio(getMoveDampingRatio()).setStiffness(getMoveStiffness());
             }
         }
 
@@ -376,6 +377,14 @@ public class TouchUtils {
             return DynamicAnimation.Y;
         }
 
+        protected float getMoveStiffness() {
+            return DEFAULT_STIFFNESS;
+        }
+
+        protected float getMoveDampingRatio() {
+            return DEFAULT_DAMPING_RATIO;
+        }
+
         protected float getStiffnessX() {
             return 150;
         }
@@ -411,7 +420,7 @@ public class TouchUtils {
 
     }
 
-    public static abstract class FlingMoveCornerListener extends FlingMoveListener {
+    public static abstract class FlingMoveToCornerListener extends FlingMoveListener {
 
         @Override
         protected boolean isCanClick(View view) {
