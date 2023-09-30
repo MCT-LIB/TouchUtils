@@ -8,6 +8,7 @@ import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewConfiguration;
+import android.view.animation.AnticipateOvershootInterpolator;
 import android.view.animation.OvershootInterpolator;
 import android.view.animation.ScaleAnimation;
 
@@ -24,6 +25,7 @@ import androidx.dynamicanimation.animation.SpringForce;
 import java.util.ArrayList;
 import java.util.List;
 
+/** @noinspection unused*/
 public class TouchUtils {
 
     private static final String TAG = "TouchMoveUtils";
@@ -578,7 +580,8 @@ public class TouchUtils {
         private static final int PIVOT_TYPE = ScaleAnimation.RELATIVE_TO_SELF;
         private static final float PIVOT_VAL = 0.5f;
         private static final float DEFAULT_REAL_SCALE = 1f;
-        private static final float DEFAULT_DELTA_SCALE = 0.25f;
+        private static final float DEFAULT_PRESS_SCALE = 0.25f;
+        private static final float DEFAULT_RELEASE_SCALE = 0.2f;
         private static final int DEFAULT_DURATION = 250;
         private static final int MIN_TAP_TIME = 1000;
         private static final int DEFAULT_OFFSET_RELEASE = 0;
@@ -598,7 +601,7 @@ public class TouchUtils {
         protected final boolean onActionDown(@NonNull View view, @NonNull MotionEvent event) {
             isRelease = false;
             float from = getRealScale();
-            float to = from + (getScaleType() == TYPE_GROW ? getDeltaScale() : -getDeltaScale());
+            float to = from + (getScaleType() == TYPE_GROW ? getPressScale() : -getPressScale());
             ScaleAnimation scaleAnimation = new ScaleAnimation(from, to, from, to, PIVOT_TYPE, PIVOT_VAL, PIVOT_TYPE, PIVOT_VAL);
             scaleAnimation.setDuration(getDuration());
             scaleAnimation.setFillAfter(true);
@@ -646,9 +649,9 @@ public class TouchUtils {
             return true;
         }
 
-        protected void release(View view, boolean isHasClick) {
+        protected final void release(View view, boolean isHasClick) {
             isRelease = true;
-            float delta = (getDeltaScale() + (isHasClick ? 0.2f : 0)) * (getDeltaScale() == TYPE_GROW ? 1 : -1);
+            float delta = (getPressScale() + (isHasClick ? getReleaseScale() : 0)) * (getScaleType() == TYPE_GROW ? 1 : -1);
             float to = getRealScale();
             float from = to + delta;
             if (from < 0) {
@@ -657,7 +660,9 @@ public class TouchUtils {
             ScaleAnimation scaleAnimation = new ScaleAnimation(from, to, from, to, PIVOT_TYPE, PIVOT_VAL, PIVOT_TYPE, PIVOT_VAL);
             scaleAnimation.setDuration(getDuration());
             if (isHasClick) {
-                scaleAnimation.setInterpolator(new OvershootInterpolator());
+                scaleAnimation.setInterpolator(getScaleType() == TYPE_GROW
+                        ? new OvershootInterpolator()
+                        : new AnticipateOvershootInterpolator());
             }
             view.startAnimation(scaleAnimation);
         }
@@ -672,10 +677,17 @@ public class TouchUtils {
         }
 
         /**
-         * Real scale (+ | -) delta scale => new scale
+         * Press scale delta
          */
-        protected float getDeltaScale() {
-            return DEFAULT_DELTA_SCALE;
+        protected float getPressScale() {
+            return DEFAULT_PRESS_SCALE;
+        }
+
+        /**
+         * Release scale delta
+         */
+        protected float getReleaseScale() {
+            return DEFAULT_RELEASE_SCALE;
         }
 
         protected int getDuration() {
