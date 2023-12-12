@@ -155,6 +155,14 @@ public class TouchUtils {
             return false;
         }
 
+        protected void performClick(@NonNull View view, @NonNull MotionEvent event) {
+            view.performClick();
+        }
+
+        protected void performLongClick(@NonNull View view, @NonNull MotionEvent event) {
+            view.performLongClick();
+        }
+
         protected boolean isTouching() {
             return state == STATE_MOVE;
         }
@@ -244,9 +252,9 @@ public class TouchUtils {
             Point predictPosition = null;
             if (isHandleClick) {
                 if (eventTime <= getMinTapTime()) {
-                    view.performClick();
+                    performClick(view, event);
                 } else {
-                    view.performLongClick();
+                    performLongClick(view, event);
                 }
             } else {
                 if (getVelocityTracker() != null) {
@@ -335,7 +343,6 @@ public class TouchUtils {
                 springX.getSpring().setDampingRatio(getDampingRatioX()).setStiffness(getStiffnessX());
                 springY.getSpring().setDampingRatio(getDampingRatioY()).setStiffness(getStiffnessY());
             } else {
-
                 springX.getSpring().setDampingRatio(getMoveDampingRatio()).setStiffness(getMoveStiffness());
                 springY.getSpring().setDampingRatio(getMoveDampingRatio()).setStiffness(getMoveStiffness());
             }
@@ -462,6 +469,10 @@ public class TouchUtils {
             };
             getSpringX().addEndListener(endListener).animateToFinalPosition(cornerPoint.x);
             getSpringY().addEndListener(endListener).animateToFinalPosition(cornerPoint.y);
+            onStartMoveToCorner(view, corner, cornerPoint);
+        }
+
+        protected void onStartMoveToCorner(@NonNull View view, @Corner int corner, @NonNull Point cornerPoint) {
         }
 
         protected void onMovedToCorner(@NonNull View view, @Corner int corner, Point cornerPoint) {
@@ -563,11 +574,15 @@ public class TouchUtils {
             };
             getSpringX().addEndListener(endListener).animateToFinalPosition(wallPoint.x);
             getSpringY().addEndListener(endListener).animateToFinalPosition(wallPoint.y);
+            onStartMoveToWall(view, wall, wallPoint);
         }
 
         @NonNull
         protected MoveMode getMoveMode() {
             return MoveMode.Vertical;
+        }
+
+        protected void onStartMoveToWall(@NonNull View view, @Wall int wall, Point wallPoint) {
         }
 
         protected void onMovedToWall(@NonNull View view, @Wall int wall, Point wallPoint) {
@@ -637,11 +652,9 @@ public class TouchUtils {
                     isHasClick = true;
                     long eventTime = event.getEventTime() - event.getDownTime();
                     if (eventTime <= getMinTapTime()) {
-                        Log.d(TAG, "onActionStop: PERFORM CLICK");
-                        view.performClick();
+                        performClick(view, event);
                     } else {
-                        Log.d(TAG, "onActionStop: PERFORM LONG CLICK");
-                        view.performLongClick();
+                        performLongClick(view, event);
                     }
                 }
             }
@@ -811,7 +824,6 @@ public class TouchUtils {
 
         return wallDistances;
     }
-
 
     public static double distance(@NonNull Point a, @NonNull Point b) {
         int dx = a.x - b.x;
