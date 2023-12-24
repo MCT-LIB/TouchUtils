@@ -276,9 +276,6 @@ public class TouchUtils {
         }
 
         protected final void setArea(@NonNull View v, @NonNull Rect rect) {
-            if (rect.equals(area)) {
-                return;
-            }
             int right = rect.right - v.getWidth();
             int bottom = rect.bottom - v.getHeight();
             area = rect;
