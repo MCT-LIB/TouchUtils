@@ -25,7 +25,9 @@ import androidx.dynamicanimation.animation.SpringForce;
 import java.util.ArrayList;
 import java.util.List;
 
-/** @noinspection unused*/
+/**
+ * @noinspection unused
+ */
 public class TouchUtils {
 
     private static final String TAG = "TouchMoveUtils";
@@ -213,6 +215,7 @@ public class TouchUtils {
         @Override
         protected void onActionTouch(@NonNull View view, @NonNull MotionEvent event) {
             event.offsetLocation(getPropX().getValue(view), getPropY().getValue(view));
+            if (!isInit) init(view);
             if (velocityTracker == null) {
                 velocityTracker = VelocityTracker.obtain();
             }
@@ -221,7 +224,6 @@ public class TouchUtils {
 
         @Override
         protected boolean onActionDown(@NonNull View view, @NonNull MotionEvent event) {
-            if (!isInit) init(view);
             setDownX(getPropX().getValue(view) - event.getRawX());
             setDownY(getPropY().getValue(view) - event.getRawY());
             resetForce(false);
@@ -329,13 +331,17 @@ public class TouchUtils {
         }
 
         protected final void clearAnimation() {
-            if (isInit) {
-                springX.cancel();
-                springY.cancel();
+            if (!isInit) {
+                return;
             }
+            springX.cancel();
+            springY.cancel();
         }
 
         protected final void resetForce(boolean isMoveToPredictPosition) {
+            if (!isInit) {
+                return;
+            }
             if (isMoveToPredictPosition) {
                 springX.getSpring().setDampingRatio(getDampingRatioX()).setStiffness(getStiffnessX());
                 springY.getSpring().setDampingRatio(getDampingRatioY()).setStiffness(getStiffnessY());
