@@ -1,0 +1,12 @@
+# note:
+# check path of '.aar.' file
+# check artifactId 'module name'
+
+# open this below comment if jitpack not work
+#jdk:
+#  - openjdk17
+before_install:
+  - ./scripts/prepareJitpackEnvironment.sh
+install:
+  - FILE="-Dfile=./touch-utils/release/touch-utils-release.aar"
+  - mvn install:install-file $FILE -DgroupId=com.mct -DartifactId=touch-utils -Dversion=2.1.1 -Dpackaging=aar -DgeneratePom=true

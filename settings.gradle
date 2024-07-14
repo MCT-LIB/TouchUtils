@@ -14,4 +14,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "TouchUtils"
 include ':app'
-include ':TouchUtils'
+include ':touch-utils'

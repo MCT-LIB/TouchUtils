@@ -22,6 +22,8 @@ import androidx.dynamicanimation.animation.FloatPropertyCompat;
 import androidx.dynamicanimation.animation.SpringAnimation;
 import androidx.dynamicanimation.animation.SpringForce;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -43,17 +45,20 @@ public class TouchUtils {
     public static final int BOT = 3;
     public static final int UNSET = 4;
 
+    public static final int TYPE_GROW = 0;
+    public static final int TYPE_SHRINK = 1;
+
+    @Retention(RetentionPolicy.SOURCE)
     @IntDef({TOP_LEFT, TOP_RIGHT, BOT_LEFT, BOT_RIGHT})
     public @interface Corner {
     }
 
+    @Retention(RetentionPolicy.SOURCE)
     @IntDef({LEFT, TOP, RIGHT, BOT})
     public @interface Wall {
     }
 
-    public static final int TYPE_GROW = 0;
-    public static final int TYPE_SHRINK = 1;
-
+    @Retention(RetentionPolicy.SOURCE)
     @IntDef({TYPE_GROW, TYPE_SHRINK})
     public @interface ScaleType {
     }
@@ -77,7 +82,7 @@ public class TouchUtils {
     // LISTENERS
     ///////////////////////////////////////////////////////////////////////////
 
-    private static abstract class BaseTouchListener implements View.OnTouchListener, Initializable {
+    public static abstract class BaseTouchListener implements View.OnTouchListener, Initializable {
 
         protected static final int STATE_DOWN = 0;
         protected static final int STATE_MOVE = 1;
@@ -737,8 +742,8 @@ public class TouchUtils {
                                   @NonNull FloatPropertyCompat<View> propertyX,
                                   @NonNull FloatPropertyCompat<View> propertyY) {
         return new Point(
-                (int) (propertyX.getValue(view) + (view.getWidth() / 2)),
-                (int) (propertyY.getValue(view) + (view.getHeight() / 2)));
+                (int) (propertyX.getValue(view) + (view.getWidth() / 2f)),
+                (int) (propertyY.getValue(view) + (view.getHeight() / 2f)));
     }
 
     @NonNull
