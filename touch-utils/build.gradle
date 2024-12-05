@@ -28,3 +28,10 @@ android {
 dependencies {
     api 'androidx.dynamicanimation:dynamicanimation:1.0.0'
 }
+
+apply from: './github-jitpack-publish.gradle'
+
+GithubJitPackPublish {
+    it.userName = "MCT-LIB"
+    it.repositoryName = "TouchUtils"
+}
