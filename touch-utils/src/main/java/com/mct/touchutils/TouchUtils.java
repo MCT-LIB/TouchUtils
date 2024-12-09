@@ -606,10 +606,14 @@ public class TouchUtils {
         private static final float DEFAULT_PRESS_SCALE = 0.25f;
         private static final float DEFAULT_RELEASE_SCALE = 0.2f;
         private static final int DEFAULT_DURATION = 250;
-        private static final int MIN_TAP_TIME = 1000;
+        private static final int MIN_TAP_TIME = 200;
         private static final int DEFAULT_OFFSET_RELEASE = 0;
+        private static final int DEFAULT_ALLOW_AUTO_RELEASE = 1;
+        private static final int DEFAULT_AUTO_RELEASE_DELAY = ViewConfiguration.getLongPressTimeout();
 
+        private final int[] location = new int[2];
         private boolean isRelease;
+        private Runnable autoReleaseRunnable;
 
         @Override
         public void init(View v) {
@@ -629,6 +633,16 @@ public class TouchUtils {
             scaleAnimation.setDuration(getDuration());
             scaleAnimation.setFillAfter(true);
             view.startAnimation(scaleAnimation);
+
+            // auto release touch
+            removeAutoRelease(view);
+            if (getAllowAutoRelease() != 0) {
+                view.postDelayed(autoReleaseRunnable = () -> {
+                    MotionEvent e = MotionEvent.obtain(-1, 0, MotionEvent.ACTION_UP, 0, 0, 0);
+                    onTouch(view, e);
+                    e.recycle();
+                }, getAutoReleaseDelay());
+            }
             return true;
         }
 
@@ -639,7 +653,7 @@ public class TouchUtils {
             }
             float x = event.getRawX();
             float y = event.getRawY();
-            Point position = getLocationOnScreen(view);
+            Point position = getLocationOnScreen(view, location);
             if (x < position.x - getOffsetReleaseX() ||
                     x > position.x + view.getWidth() + getOffsetReleaseX() ||
                     y < position.y - getOffsetReleaseY() ||
@@ -659,7 +673,7 @@ public class TouchUtils {
                 if (getState() == STATE_DOWN) {
                     isHasClick = true;
                     long eventTime = event.getEventTime() - event.getDownTime();
-                    if (eventTime <= getMinTapTime()) {
+                    if (eventTime <= getMinTapTime() && event.getDownTime() != -1) {
                         performClick(view, event);
                     } else {
                         performLongClick(view, event);
@@ -686,6 +700,14 @@ public class TouchUtils {
                         : new AnticipateOvershootInterpolator());
             }
             view.startAnimation(scaleAnimation);
+            removeAutoRelease(view);
+        }
+
+        protected final void removeAutoRelease(View view) {
+            if (autoReleaseRunnable != null) {
+                view.removeCallbacks(autoReleaseRunnable);
+                autoReleaseRunnable = null;
+            }
         }
 
         @ScaleType
@@ -725,6 +747,14 @@ public class TouchUtils {
 
         protected int getOffsetReleaseY() {
             return DEFAULT_OFFSET_RELEASE;
+        }
+
+        protected int getAllowAutoRelease() {
+            return DEFAULT_ALLOW_AUTO_RELEASE;
+        }
+
+        protected int getAutoReleaseDelay() {
+            return DEFAULT_AUTO_RELEASE_DELAY;
         }
 
     }
@@ -840,8 +870,7 @@ public class TouchUtils {
     }
 
     @NonNull
-    public static Point getLocationOnScreen(@NonNull View view) {
-        int[] location = new int[2];
+    public static Point getLocationOnScreen(@NonNull View view, @NonNull int[] location) {
         view.getLocationOnScreen(location);
         return new Point(location[0], location[1]);
     }
