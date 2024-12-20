@@ -1,126 +1,185 @@
 package com.mct.touchutils.test;
 
-import android.Manifest;
+import static com.mct.touchutils.TouchUtils.BaseTouchListener;
+import static com.mct.touchutils.TouchUtils.FlingMoveToCornerListener;
+import static com.mct.touchutils.TouchUtils.FlingMoveToWallListener;
+import static com.mct.touchutils.TouchUtils.FlingMoveToWallListener.MoveMode;
+import static com.mct.touchutils.TouchUtils.ScaleType;
+import static com.mct.touchutils.TouchUtils.TouchScaleListener;
+import static com.mct.touchutils.TouchUtils.setTouchListener;
+
+import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.dynamicanimation.animation.FloatPropertyCompat;
-import androidx.fragment.app.FragmentActivity;
 
 import com.mct.touchutils.TouchUtils;
-import com.permissionx.guolindev.PermissionX;
-import com.permissionx.guolindev.callback.RequestCallback;
 
 public class MainActivity extends AppCompatActivity {
 
-    static boolean isAdd;
-
-    BubbleBaseLayout baseLayout;
+    private BubbleBaseLayout bubbleLayout;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        if (getSupportActionBar() != null) getSupportActionBar().hide();
-
-        requestOverlayPermission(this, (allGranted, grantedList, deniedList) -> {
-            if (allGranted && !isAdd) {
-                isAdd = true;
-                baseLayout = new BubbleBaseLayout(MainActivity.this);
-                View view = new View(MainActivity.this);
-                baseLayout.addView(view);
-
-                view.getLayoutParams().width = 150;
-                view.getLayoutParams().height = 150;
-                view.setBackgroundColor(Color.BLUE);
-
-                baseLayout.setWindowManager((WindowManager) getSystemService(WINDOW_SERVICE));
-                baseLayout.setViewParams(getWindowParams(
-                        getScreenWidth() - 150, 0,
-                        WindowManager.LayoutParams.WRAP_CONTENT,
-                        WindowManager.LayoutParams.WRAP_CONTENT,
-                        false)
-                );
-                baseLayout.attachToWindow();
-
-                TouchUtils.setTouchListener(baseLayout, new TouchUtils.FlingMoveToWallListener() {
-                    @NonNull
-                    @Override
-                    public Rect initArea(View view) {
-                        final int left = 0, top = 0, right = getScreenWidth(), bottom = getScreenHeight() - 140;
-                        return new Rect(left, top, right, bottom);
-                    }
-
-                    @Override
-                    protected FloatPropertyCompat<View> getPropX() {
-                        return BubbleBaseLayout.WINDOW_X.getPropertyCompat();
-                    }
-
-                    @Override
-                    protected FloatPropertyCompat<View> getPropY() {
-                        return BubbleBaseLayout.WINDOW_Y.getPropertyCompat();
-                    }
-
-                });
-            }
-        });
-
-        findViewById(R.id.btnClear).setOnClickListener(v -> {
-            if (baseLayout != null) {
-                baseLayout.detachFromWindow();
-                baseLayout = null;
-            }
-        });
-
-        View box = findViewById(R.id.box);
-
-//        TouchUtils.setTouchListener(box, new TouchUtils.TouchMoveCornerListener() {
-//            @NonNull
-//            @Override
-//            public Rect initArea(View view) {
-//                final int left = 0, top = 0, right = getScreenWidth(), bottom = getScreenHeight() - 140;
-//                return new Rect(left, top, right, bottom);
-//            }
-//
-////            @NonNull
-////            @Override
-////            protected Rect initAnimArea(@NonNull View view) {
-////                int width = view.getWidth() / 2;
-////                int height = view.getHeight() / 2;
-////                Rect area = getArea();
-////                return new Rect(
-////                        area.left - width,
-////                        area.top - height,
-////                        area.right - view.getWidth() + width,
-////                        area.bottom - view.getHeight() + height
-////                );
-////            }
-//        });
-
-//        TouchUtils.setTouchListener(box, new TouchUtils.FlingMoveToWallListener() {
-//            @NonNull
-//            @Override
-//            public Rect initArea(View view) {
-//                final int left = 0, top = 0, right = getScreenWidth(), bottom = getScreenHeight() - 140;
-//                return new Rect(left, top, right, bottom);
-//            }
-//        });
-
-        TouchUtils.setTouchListener(box, new TouchUtils.TouchScaleListener());
-
+        findViewById(R.id.btnAdd).setOnClickListener(this::onClick);
+        findViewById(R.id.btnRemove).setOnClickListener(this::onClick);
+        findViewById(R.id.btnMoveToCorner).setOnClickListener(this::onClick);
+        findViewById(R.id.btnMoveToWall).setOnClickListener(this::onClick);
+        findViewById(R.id.btnMoveToWallH).setOnClickListener(this::onClick);
+        findViewById(R.id.btnMoveToWallV).setOnClickListener(this::onClick);
+        findViewById(R.id.btnScaleUp).setOnClickListener(this::onClick);
+        findViewById(R.id.btnScaleDown).setOnClickListener(this::onClick);
     }
 
-    int getScreenWidth() {
+    private void onClick(@NonNull View view) {
+        int id = view.getId();
+        if (id == R.id.btnAdd) {
+            if (hasOverlayPermission(this)) {
+                addBubble();
+            } else {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
+                }
+            }
+        } else if (id == R.id.btnRemove) {
+            removeBubble();
+        } else if (id == R.id.btnMoveToCorner) {
+            removeTouchListener();
+            setTouchListener(bubbleLayout, createMoveToCornerListener());
+        } else if (id == R.id.btnMoveToWall) {
+            removeTouchListener();
+            setTouchListener(bubbleLayout, createMoveToWallListener(MoveMode.Nearest));
+        } else if (id == R.id.btnMoveToWallH) {
+            removeTouchListener();
+            setTouchListener(bubbleLayout, createMoveToWallListener(MoveMode.Horizontal));
+        } else if (id == R.id.btnMoveToWallV) {
+            removeTouchListener();
+            setTouchListener(bubbleLayout, createMoveToWallListener(MoveMode.Vertical));
+        } else if (id == R.id.btnScaleUp) {
+            removeTouchListener();
+            setTouchListener(bubbleLayout.getChildAt(0), createScaleListener(TouchUtils.TYPE_GROW));
+        } else if (id == R.id.btnScaleDown) {
+            removeTouchListener();
+            setTouchListener(bubbleLayout.getChildAt(0), createScaleListener(TouchUtils.TYPE_SHRINK));
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private void removeTouchListener() {
+        if (bubbleLayout != null) {
+            bubbleLayout.setOnTouchListener(null);
+            bubbleLayout.getChildAt(0).setOnTouchListener(null);
+        }
+    }
+
+    @NonNull
+    private BaseTouchListener createMoveToCornerListener() {
+        return new FlingMoveToCornerListener() {
+            @NonNull
+            @Override
+            protected Rect initArea(View view) {
+                return new Rect(50, 150, getScreenWidth() - 50, getScreenHeight() - 150);
+            }
+
+            @Override
+            protected FloatPropertyCompat<View> getPropX() {
+                return BubbleBaseLayout.WINDOW_X.getPropertyCompat();
+            }
+
+            @Override
+            protected FloatPropertyCompat<View> getPropY() {
+                return BubbleBaseLayout.WINDOW_Y.getPropertyCompat();
+            }
+        };
+    }
+
+    @NonNull
+    private BaseTouchListener createMoveToWallListener(MoveMode moveMode) {
+        return new FlingMoveToWallListener() {
+            @NonNull
+            @Override
+            protected Rect initArea(View view) {
+                return new Rect(50, 150, getScreenWidth() - 50, getScreenHeight() - 150);
+            }
+
+            @NonNull
+            @Override
+            protected MoveMode getMoveMode() {
+                return moveMode;
+            }
+
+            @Override
+            protected FloatPropertyCompat<View> getPropX() {
+                return BubbleBaseLayout.WINDOW_X.getPropertyCompat();
+            }
+
+            @Override
+            protected FloatPropertyCompat<View> getPropY() {
+                return BubbleBaseLayout.WINDOW_Y.getPropertyCompat();
+            }
+        };
+    }
+
+    @NonNull
+    private BaseTouchListener createScaleListener(@ScaleType int scaleType) {
+        return new TouchScaleListener() {
+            @Override
+            protected int getScaleType() {
+                return scaleType;
+            }
+        };
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        removeBubble();
+    }
+
+    private void addBubble() {
+        View view = new View(MainActivity.this);
+        bubbleLayout = new BubbleBaseLayout(MainActivity.this);
+        bubbleLayout.addView(view);
+
+        ((FrameLayout.LayoutParams) view.getLayoutParams()).gravity = Gravity.CENTER;
+        view.getLayoutParams().width = 150;
+        view.getLayoutParams().height = 150;
+        view.setBackgroundColor(Color.BLUE);
+
+        bubbleLayout.setWindowManager((WindowManager) getSystemService(WINDOW_SERVICE));
+        bubbleLayout.setViewParams(getWindowParams(
+                (getScreenWidth() - 150) / 2, 150,
+                200,
+                200
+        ));
+        bubbleLayout.attachToWindow();
+    }
+
+    private void removeBubble() {
+        if (bubbleLayout != null) {
+            bubbleLayout.detachFromWindow();
+            bubbleLayout = null;
+        }
+    }
+
+    private int getScreenWidth() {
         WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
         if (wm == null) {
             return -1;
@@ -130,7 +189,7 @@ public class MainActivity extends AppCompatActivity {
         return point.x;
     }
 
-    int getScreenHeight() {
+    private int getScreenHeight() {
         WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
         if (wm == null) {
             return -1;
@@ -141,10 +200,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @NonNull
-    static WindowManager.LayoutParams getWindowParams(int x, int y, int width, int height, boolean focusable) {
+    private static WindowManager.LayoutParams getWindowParams(int x, int y, int width, int height) {
+        int type = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                : WindowManager.LayoutParams.TYPE_PHONE;
+
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 width, height,
-                getType(), getFlag(focusable),
+                type,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT
         );
         params.gravity = Gravity.TOP | Gravity.START;
@@ -153,33 +219,11 @@ public class MainActivity extends AppCompatActivity {
         return params;
     }
 
-    private static int getType() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                : WindowManager.LayoutParams.TYPE_PHONE;
-    }
-
-    private static int getFlag(boolean focusable) {
-        if (focusable) {
-            return WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-                    | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
-            // | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
-        } else {
-            return WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                    | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                    | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                    ;
+    private static boolean hasOverlayPermission(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            return Settings.canDrawOverlays(context);
         }
-    }
-
-    public static void requestOverlayPermission(FragmentActivity activity, RequestCallback callback) {
-        PermissionX.init(activity)
-                .permissions(Manifest.permission.SYSTEM_ALERT_WINDOW)
-                .onExplainRequestReason((scope, deniedList) -> scope.showRequestReasonDialog(deniedList,
-                        "You need to grant the app permission to use this feature.",
-                        "OK",
-                        "Cancel"))
-                .request(callback);
+        return true;
     }
 
 }
